@@ -1,6 +1,7 @@
-from flask import Flask
+from flask import Flask, jsonify, request
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
+import requests
 
 app = Flask(__name__)
 api = Api(app)
@@ -43,24 +44,55 @@ resource_fields = {
 }
 
 
-class Video(Resource):
+class VideoAll(Resource):
     @marshal_with(resource_fields)
-    def get(self, video_id):
-        result = VideoModel.query.filter_by(id=video_id).first()
+    def get(self):
+        result = VideoModel.query.all()
         if not result:
             abort(404, message='Could not find video with that id....')
         return result
 
     @marshal_with(resource_fields)
-    def put(self, video_id):
-        args = video_put_args.parse_args()
-        result = VideoModel.query.filter_by(id=video_id).first()
-        if result:
-            abort(409, message='Video id taken...')
-        video = VideoModel(id=video_id, name=args['name'], views=args['views'], likes=args['likes'])
+    def post(self):
+        # args = request.get_json()
+        args = video_update_args.parse_args()
+        # result = VideoModel.query.all()
+        # if result:
+        #     abort(409, message='Video id taken...')
+        video = VideoModel(name=args['name'], views=args['views'], likes=args['likes'])
         db.session.add(video)
         db.session.commit()
-        return video, 201
+        return 'Successful', 201
+
+
+@marshal_with(resource_fields)
+@app.route('/add_video', methods=['POST'])
+def add_video():
+    args = request.get_json()
+    video = VideoModel(name=args['name'], views=args['views'], likes=args['likes'])
+    db.session.add(video)
+    db.session.commit()
+    return 'Successful', 201
+
+
+class Video(Resource):
+    # @marshal_with(resource_fields)
+    # def get(self, video_id):
+    #     result = VideoModel.query.filter_by(id=video_id).first()
+    #     if not result:
+    #         abort(404, message='Could not find video with that id....')
+    #     return result
+
+    # @marshal_with(resource_fields)
+    # def put(self, video_id):
+    #     args = video_put_args.parse_args()
+    #     result = VideoModel.query.filter_by(id=video_id).first()
+    #     if result:
+    #         abort(409, message='Video id taken...')
+    #     video = VideoModel(id=video_id, name=args['name'], views=args['views'], likes=args['likes'])
+    #     db.session.add(video)
+    #     db.session.commit()
+    #     return video, 201
 
     @marshal_with(resource_fields)
     def patch(self, video_id):
@@ -90,6 +122,61 @@ class Video(Resource):
 
 
 api.add_resource(Video, "/video/<int:video_id>")
+
+api.add_resource(VideoAll, "/videos")
+# api.add_resource(VideoAll.post, "/videoput")
+
+
+@marshal_with(resource_fields)
+@app.route('/get')
+def get():
+    result = VideoModel.query.all()
+    videos = []
+    for video in result:
+        videos.append({'name': video.name, 'likes': video.likes, 'views': video.views})
+
+    return jsonify({'videoss': videos})
+
+
+@marshal_with(resource_fields)
+def put(self, video_id):
+    args = video_put_args.parse_args()
+    result = VideoModel.query.filter_by(id=video_id).first()
+    if result:
+        abort(409, message='Video id taken...')
+    video = VideoModel(id=video_id, name=args['name'], views=args['views'], likes=args['likes'])
+    db.session.add(video)
+    db.session.commit()
+    return video, 201
+
+
+@marshal_with(resource_fields)
+def patch(self, video_id):
+    args = video_update_args.parse_args()
+    result = VideoModel.query.filter_by(id=video_id).first()
+    if not result:
+        abort(404, message='Could not find video with that id....cannot update')
+
+    if args['name']:
+        result.name = args['name']
+    if args['views']:
+        result.views = args['views']
+    if args['likes']:
+        result.likes = args['likes']
+
+    db.session.commit()
+
+    return result
+
+
+def delete(self, video_id):
+    result = VideoModel.query.filter_by(id=video_id).first()
+    if not result:
+        abort(404, message='Could not find video with that id....cannot delete')
+    db.session.delete(result)
+    db.session.commit()
+    return '', 204
+
 
 if __name__ == "__main__":
     app.run(debug=True)
