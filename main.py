@@ -1,10 +1,21 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, make_response
 from flask_restful import Api, Resource, reqparse, abort, fields, marshal_with
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS, cross_origin
 import requests
 
 app = Flask(__name__)
 api = Api(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
+app.config['CORS_HEADERS'] = 'Content-Type'
+
+@app.after_request
+def after_request(response):
+  response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')
+  response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+  response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS')
+  response.headers.add('Access-Control-Allow-Credentials', 'true')
+  return response
 
 SERVER = '172.16.1.104,1433\LGEDSQL'
 DATABASE = 'Mydatabase'
@@ -52,6 +63,7 @@ class VideoAll(Resource):
             abort(404, message='Could not find video with that id....')
         return result
 
+
     @marshal_with(resource_fields)
     def post(self):
         # args = request.get_json()
@@ -76,23 +88,23 @@ def add_video():
 
 
 class Video(Resource):
-    # @marshal_with(resource_fields)
-    # def get(self, video_id):
-    #     result = VideoModel.query.filter_by(id=video_id).first()
-    #     if not result:
-    #         abort(404, message='Could not find video with that id....')
-    #     return result
+    @marshal_with(resource_fields)
+    def get(self, video_id):
+        result = VideoModel.query.filter_by(id=video_id).first()
+        if not result:
+            abort(404, message='Could not find video with that id....')
+        return result
 
-    # @marshal_with(resource_fields)
-    # def put(self, video_id):
-    #     args = video_put_args.parse_args()
-    #     result = VideoModel.query.filter_by(id=video_id).first()
-    #     if result:
-    #         abort(409, message='Video id taken...')
-    #     video = VideoModel(id=video_id, name=args['name'], views=args['views'], likes=args['likes'])
-    #     db.session.add(video)
-    #     db.session.commit()
-    #     return video, 201
+    @marshal_with(resource_fields)
+    def put(self, video_id):
+        args = video_put_args.parse_args()
+        result = VideoModel.query.filter_by(id=video_id).first()
+        if result:
+            abort(409, message='Video id taken...')
+        video = VideoModel(id=video_id, name=args['name'], views=args['views'], likes=args['likes'])
+        db.session.add(video)
+        db.session.commit()
+        return video, 201
 
     @marshal_with(resource_fields)
     def patch(self, video_id):
@@ -119,6 +131,16 @@ class Video(Resource):
         db.session.delete(result)
         db.session.commit()
         return '', 204
+
+
+@marshal_with(resource_fields)
+@app.route('/show/<int:id>', methods=['POST', 'GET'])
+def show(id):
+    result = VideoModel.query.filter_by(id=id).first()
+    videos = []
+    for video in result:
+        videos.append({'name': video.name, 'likes': video.likes, 'views': video.views})
+    return jsonify({'videoss': videos})
 
 
 api.add_resource(Video, "/video/<int:video_id>")
